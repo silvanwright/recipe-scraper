@@ -1,0 +1,1 @@
+Recipe scraper for recipes.fandom.com. File name stands for "Beautiful Soup Scraper", obviously!
