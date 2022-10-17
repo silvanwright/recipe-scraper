@@ -2,13 +2,14 @@ from bs4 import BeautifulSoup
 import requests
 from requests_file import FileAdapter
 import lxml
+import pandas
+import sqlite3
 
-urlstart = 'href="'
-urlend = '" title'
 base_url = "https://recipes.fandom.com"
 
     
 def get_ingredients(url):
+    #TODO: deal with RIDICULOUS recipes that put ingredients in a paragraph
     recipe_text=requests.get(url).text
     soup = BeautifulSoup(recipe_text, 'lxml')
     ingredients=[]
@@ -52,7 +53,7 @@ def get_directions(url):
             tag_name = next_sib.name
         except AttributeError:
             break
-        if (tag_name == "ol"):
+        if (tag_name == "ol" or tag_name == 'ul'):
             for li in next_sib.find_all('li'):
                 directions.append(li.text)
         elif (tag_name == "p"):
@@ -74,32 +75,60 @@ def get_directions(url):
             break
     return directions
 
-html_text = requests.get('https://recipes.fandom.com/wiki/Category:Main_Dish_Recipes').text 
+def get_categories(url):
+    recipe_text=requests.get(url).text
+    soup = BeautifulSoup(recipe_text, 'lxml')
+    categories = []
+    category_section= soup.find('div', class_='page-header__categories').find_all('a', {"title": lambda x: x and x.startswith('Category:')})
+    for category in category_section:
+        categories.append(category.text)
+    return categories                                 
+
+def parse_recipes(recipes):
+    count = 0
+    recipe_list=[]
+    for recipe in recipes:
+        link= recipe.find('a')
+        title = link.get('title')
+        title = title.replace('Oriental', 'Asian') #modernize the titles
+        if (title.startswith("Category:")):
+            continue
+        url = base_url+link.get('href')
+        ingredients = []
+        try:
+            ingredients = get_ingredients(url)
+        except:
+            continue
+        try:
+            directions = get_directions(url)
+        except:
+            continue
+        try:
+            categories = get_categories(url)
+        except:
+            continue
+        recipe_list.append([title, url, repr(ingredients), repr(directions), repr(categories)])
+        count+=1
+    print(f"{count} recipes parsed")
+    return(recipe_list)
+
+html_text = requests.get('https://recipes.fandom.com/wiki/Category:Dessert_Recipes?from=Sock-It-To-Me+Coffee+Cake').text 
 soup = BeautifulSoup(html_text, 'lxml')
 recipes = soup.find_all('li', class_='category-page__member')
+recipe_list = parse_recipes(recipes)
 
-count = 0
+#TODO: wrap in a function that crawls all pages in a category. Next category: Dinner recipes in 'by course'
+next_page= soup.find('a', class_='category-page__pagination-next wds-button wds-is-secondary')
+print(f"Next page: {next_page.get('href')}")#TODO: except attribute error (break when reaching last page)
 
-for recipe in recipes:
-    link= recipe.find('a')
-    title = link.get('title')
-    title = title.replace('Oriental', 'Asian') #modernize the titles
-    if (title.startswith("Category:")):
-        continue
-    url = base_url+link.get('href')
-    ingredients = []
-    try:
-        ingredients = get_ingredients(url)
-    except:
-        continue
-    try:
-        directions = get_directions(url)
-    except:
-        continue
-    print(title)
-    print(url)
-    print(ingredients)
-    print(directions)
-    count+=1
+df = pandas.DataFrame (recipe_list, columns = ['Title', 'Url', 'Ingredients', 'Directions', 'Categories'])
+print(df)
 
-print(f"{count} recipes parsed")
+conn = sqlite3.connect("recipes.db")
+cursor=conn.cursor()
+create_sql = "CREATE TABLE IF NOT EXISTS recipes (title TEXT, url INTEGER, ingredients TEXT, directions TEXT, categories TEXT)"
+cursor.execute(create_sql)
+
+df.to_sql(name="recipes", con=conn, if_exists='append', index=False)
+conn.commit
+conn.close
