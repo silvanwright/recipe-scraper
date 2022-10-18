@@ -5,11 +5,11 @@ import lxml
 import pandas
 import sqlite3
 
+from sqlalchemy import null
+
 base_url = "https://recipes.fandom.com"
 
-    
 def get_ingredients(url):
-    #TODO: deal with RIDICULOUS recipes that put ingredients in a paragraph
     recipe_text=requests.get(url).text
     soup = BeautifulSoup(recipe_text, 'lxml')
     ingredients=[]
@@ -30,13 +30,21 @@ def get_ingredients(url):
         elif (tag_name == "h3"):
             clean_h3 = next_sib.text[:-2]
             ingredients.append(clean_h3)
-        elif (tag_name == "h2"):
-            break
+        elif (tag_name == 'p'):
+            clean_paragraph = next_sib.text.replace('\n', '')
+            if clean_paragraph!='':
+                ingredients.append(clean_paragraph)
+        elif (tag_name=='div'):
+            continue
+        elif (tag_name=='figure'):
+            continue
         elif (tag_name==None):
             continue
+        elif (tag_name == "h2"):
+            break
         else:
             break
-    return ingredients        
+    return ingredients            
 
 def get_directions(url):
     recipe_text=requests.get(url).text
