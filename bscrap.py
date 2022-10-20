@@ -124,7 +124,7 @@ def save_to_db(recipe_list):
 
     conn = sqlite3.connect("recipes2.db")
     cursor=conn.cursor()
-    create_sql = "CREATE TABLE IF NOT EXISTS recipes (title TEXT, url INTEGER, ingredients TEXT, directions TEXT, categories TEXT)"
+    create_sql = "CREATE TABLE IF NOT EXISTS recipes (title TEXT, url TEXT, ingredients TEXT, directions TEXT, categories TEXT)"
     cursor.execute(create_sql)
 
     df.to_sql(name="recipes", con=conn, if_exists='append', index=False)
@@ -145,4 +145,4 @@ def crawl_category(url):
         return recipe_list
 
 #TODO: Next category: Dinner recipes in 'by course'
-crawl_category('https://recipes.fandom.com/wiki/Category:Breakfast_Recipes')
+crawl_category('https://recipes.fandom.com/wiki/Category:Brunch_Recipes')
