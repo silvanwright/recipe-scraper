@@ -4,7 +4,6 @@ from requests_file import FileAdapter
 import lxml
 import pandas
 import sqlite3
-
 from sqlalchemy import null
 
 base_url = "https://recipes.fandom.com"
@@ -98,11 +97,10 @@ def parse_recipes(recipes):
     for recipe in recipes:
         link= recipe.find('a')
         title = link.get('title')
-        title = title.replace('Oriental', 'Asian') #modernize the titles
         if (title.startswith("Category:")):
             continue
+        title = title.replace('Oriental', 'Asian') #modernize the titles        
         url = base_url+link.get('href')
-        ingredients = []
         try:
             ingredients = get_ingredients(url)
         except:
@@ -120,23 +118,31 @@ def parse_recipes(recipes):
     print(f"{count} recipes parsed")
     return(recipe_list)
 
-html_text = requests.get('https://recipes.fandom.com/wiki/Category:Dessert_Recipes?from=Sock-It-To-Me+Coffee+Cake').text 
-soup = BeautifulSoup(html_text, 'lxml')
-recipes = soup.find_all('li', class_='category-page__member')
-recipe_list = parse_recipes(recipes)
+def save_to_db(recipe_list):
+    df = pandas.DataFrame (recipe_list, columns = ['Title', 'Url', 'Ingredients', 'Directions', 'Categories'])
+    print(df)
 
-#TODO: wrap in a function that crawls all pages in a category. Next category: Dinner recipes in 'by course'
-next_page= soup.find('a', class_='category-page__pagination-next wds-button wds-is-secondary')
-print(f"Next page: {next_page.get('href')}")#TODO: except attribute error (break when reaching last page)
+    conn = sqlite3.connect("recipes2.db")
+    cursor=conn.cursor()
+    create_sql = "CREATE TABLE IF NOT EXISTS recipes (title TEXT, url INTEGER, ingredients TEXT, directions TEXT, categories TEXT)"
+    cursor.execute(create_sql)
 
-df = pandas.DataFrame (recipe_list, columns = ['Title', 'Url', 'Ingredients', 'Directions', 'Categories'])
-print(df)
+    df.to_sql(name="recipes", con=conn, if_exists='append', index=False)
+    conn.commit
+    conn.close
 
-conn = sqlite3.connect("recipes.db")
-cursor=conn.cursor()
-create_sql = "CREATE TABLE IF NOT EXISTS recipes (title TEXT, url INTEGER, ingredients TEXT, directions TEXT, categories TEXT)"
-cursor.execute(create_sql)
+def crawl_category(url):
+    html_text = requests.get(url).text 
+    soup = BeautifulSoup(html_text, 'lxml')
+    recipes = soup.find_all('li', class_='category-page__member')
+    recipe_list=parse_recipes(recipes)
+    save_to_db(recipe_list)
+    print(f"saved {url} recipes to database")  
+    try:
+        next_page= soup.find('a', class_='category-page__pagination-next wds-button wds-is-secondary')
+        crawl_category(next_page.get('href'))
+    except AttributeError:
+        return recipe_list
 
-df.to_sql(name="recipes", con=conn, if_exists='append', index=False)
-conn.commit
-conn.close
+#TODO: Next category: Dinner recipes in 'by course'
+crawl_category('https://recipes.fandom.com/wiki/Category:Breakfast_Recipes')
