@@ -49,17 +49,21 @@ def get_directions(url):
     recipe_text=requests.get(url).text
     soup = BeautifulSoup(recipe_text, 'lxml')
     directions = []
-    try:
-        directions_heading = soup.find('span', {"id": lambda x: x and x.startswith('Directions')}).find_parent()
-    except AttributeError:
-        return null
-    next_sib = directions_heading.nextSibling
+    directions_heading=None
+    for heading in ("Directions", "Instructions", "Method"):
+        try:
+            directions_heading = soup.find('span', {"id": lambda x: x and x.startswith(heading)}).find_parent()        
+        except AttributeError:
+            continue
+    if not directions_heading:
+        directions = "Not found"
+        return directions
+    next_sib = directions_heading
     while True:
         next_sib = next_sib.nextSibling
-        try:
-            tag_name = next_sib.name
-        except AttributeError:
+        if not next_sib:
             break
+        tag_name=next_sib.name
         if (tag_name == "ol" or tag_name == 'ul'):
             for li in next_sib.find_all('li'):
                 directions.append(li.text)
@@ -74,8 +78,6 @@ def get_directions(url):
             clean_h3 = next_sib.text[:-2]
             if (clean_h3!="Other Links"):
                 directions.append(clean_h3)
-        elif (tag_name == "h2"):
-            break
         elif (tag_name==None):
             continue
         else:
@@ -137,12 +139,13 @@ def crawl_category(url):
     recipes = soup.find_all('li', class_='category-page__member')
     recipe_list=parse_recipes(recipes)
     save_to_db(recipe_list)
-    print(f"saved {url} recipes to database")  
-    try:
-        next_page= soup.find('a', class_='category-page__pagination-next wds-button wds-is-secondary')
-        crawl_category(next_page.get('href'))
-    except AttributeError:
+    print(f"saved {url} recipes to database")
+    next_page=None
+    next_page= soup.find('a', class_='category-page__pagination-next wds-button wds-is-secondary')        
+    if not next_page:
         return recipe_list
+    else:
+        crawl_category(next_page.get('href'))
 
 #TODO: Next category: Dinner recipes in 'by course'
 crawl_category('https://recipes.fandom.com/wiki/Category:Brunch_Recipes')
