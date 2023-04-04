@@ -14,7 +14,7 @@ categories=('Breakfast_Recipes', 'Brunch_Recipes', 'Dessert_Recipes', 'Dinner_Re
             'Soup_Recipes', 'Stew_Recipes', 'Vegetarian_Recipes', 'Smoothie_Recipes',
             'Condiment_Recipes')
 category_base_url = 'https://recipes.fandom.com/wiki/Category:'
-#TODO: crawl all categories
+
 #To crawl one category, insert the link below:
 category_link='https://recipes.fandom.com/wiki/Category:Dessert_Recipes'
 
@@ -141,10 +141,13 @@ def crawl_category(category_url, recipe_link_list):
         crawl_category(next_page.get('href'), recipe_links)
 
 recipe_links=[]
-crawl_category(category_link, recipe_links)
+for category in categories:
+    cat_link = category_base_url+category
+    print(f"Crawling category {category}, link {cat_link}")
+    crawl_category(cat_link, recipe_links)
+recipe_links = [*set(recipe_links)] #remove duplicates
 recipe_data=parse_recipes(recipe_links)
 recipe_df = pandas.DataFrame (recipe_data, columns = ['Title', 'Url', 'Ingredients', 'Directions', 'Categories'])
-#TODO: remove duplicates
 
 ############ OUTPUT #############
 #print(recipe_df)
